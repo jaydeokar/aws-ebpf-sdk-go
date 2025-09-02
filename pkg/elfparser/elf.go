@@ -687,30 +687,33 @@ func (e *elfLoader) doLoadELF(inputData BpfCustomData) (map[string]BpfData, map[
 	return loadedProgData, loadedMapData, nil
 }
 
-func GetMapNameFromBPFPinPath(pinPath string) (string, string) {
+var nonGlobalMaps = map[string]struct{}{
+	"ingress_map":           {},
+	"egress_map":            {},
+	"ingress_pod_state_map": {},
+	"egress_pod_state_map":  {},
+	"admin_ingress_map":     {},
+	"admin_egress_map":      {},
+}
 
-	splittedPinPath := strings.Split(pinPath, "/")
-	lastSegment := splittedPinPath[len(splittedPinPath)-1]
-	// Split at the first occurrence of "_"
+func GetMapNameFromBPFPinPath(pinPath string) (string, string) {
+	lastSegment := path.Base(pinPath)
 	mapNamespace, mapName, _ := strings.Cut(lastSegment, "_")
 	log.Infof("Found Identified - %s : %s", mapNamespace, mapName)
 
-	if mapName == "ingress_map" || mapName == "egress_map" || mapName == "ingress_pod_state_map" || mapName == "egress_pod_state_map" {
+	if _, exists := nonGlobalMaps[mapName]; exists {
 		log.Infof("Adding %s -> %s", mapName, mapNamespace)
 		return mapName, mapNamespace
 	}
 
-	//This is global map, we cannot use global since there are multiple maps
 	log.Infof("Adding GLOBAL %s -> %s", mapName, mapName)
 	return mapName, mapName
 }
 
 func IsMapGlobal(pinPath string) bool {
 	mapName, _ := GetMapNameFromBPFPinPath(pinPath)
-	if mapName == "ingress_map" || mapName == "egress_map" || mapName == "ingress_pod_state_map" || mapName == "egress_pod_state_map" {
-		return false
-	}
-	return true
+	_, exists := nonGlobalMaps[mapName]
+	return !exists
 }
 
 func (b *bpfSDKClient) RecoverGlobalMaps() (map[string]ebpf_maps.BpfMap, error) {
