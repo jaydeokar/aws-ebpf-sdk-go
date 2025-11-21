@@ -62,7 +62,7 @@ endif
 $(TESTDATADIR)/vmlinux.h:
 	$(BPFTOOL) btf dump file $(VMLINUX_BTF) format c > $@
 
-##@ Run Unit Tests
+##@ Run Unit Tests hello
 # Run unit tests
 unit-test: $(TESTDATADIR)/vmlinux.h
 unit-test: $(addsuffix .bpf.elf,$(TARGETS))
