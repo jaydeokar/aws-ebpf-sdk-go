@@ -26,6 +26,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libbpf-dev linux-tools-generic \
             linux-headers-$(uname -r) libelf-dev zlib1g-dev
+
           # linux-tools-generic ships a versioned bpftool (may be a symlink); resolve and put it in PATH
           BPFTOOL_BIN="$(find /usr/lib/linux-tools/ -name bpftool 2>/dev/null | head -1)"
           [ -n "${BPFTOOL_BIN}" ] && sudo ln -sf "$(realpath ${BPFTOOL_BIN})" /usr/local/bin/bpftool
@@ -49,12 +50,16 @@ jobs:
           go-version-file: 'go.mod'
       - name: Set up BPF and Linux Headers
         run: |
+          set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y libbpf-dev linux-tools-generic \
             linux-headers-$(uname -r) libelf-dev zlib1g-dev
+
+          # linux-tools-generic ships a versioned bpftool (may be a symlink); resolve and put it in PATH
           BPFTOOL_BIN="$(find /usr/lib/linux-tools/ -name bpftool 2>/dev/null | head -1)"
           [ -n "${BPFTOOL_BIN}" ] && sudo ln -sf "$(realpath ${BPFTOOL_BIN})" /usr/local/bin/bpftool
           bpftool version
+          test -r /sys/kernel/btf/vmlinux
       - name: Build
         run: make build-linux
       - name: Functional test
