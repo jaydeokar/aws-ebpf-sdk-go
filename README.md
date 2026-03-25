@@ -9,7 +9,7 @@ SDK currently supports -
    b. XDP
    c. Kprobes/Kretprobes
    d. Tracepoint probes
-2. Ring buffer (would need kernel 5.10+)
+2. Ring buffer (would need kernel 5.10+) hello
 
 SDK currently do not support -
 
