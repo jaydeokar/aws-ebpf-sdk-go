@@ -34,7 +34,10 @@ jobs:
           sudo apt-get install -y libbpf-dev 
           sudo apt-get install -y linux-tools-common 
           sudo apt-get install -y linux-headers-$(uname -r) libelf-dev zlib1g-dev
-          ls /usr/lib/linux-tools/$(uname -r)/bpftool
+          git clone --depth=1 --branch v7.3.0 https://github.com/libbpf/bpftool.git
+          cd bpftool/src
+          make
+          sudo make install    
       - name: Build
         run: make build-linux
       - name: Unit test
