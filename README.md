@@ -9,9 +9,9 @@ SDK currently supports -
    b. XDP
    c. Kprobes/Kretprobes
    d. Tracepoint probes
-2. Ring buffer (would need kernel 5.10+)HelloWorld
+2. Ring buffer (would need kernel 5.10+)
 
-SDK currently do not support -
+SDK currently do not support -2
 
 1. Map in Map
 2. Perf buffer
