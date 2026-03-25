@@ -22,28 +22,22 @@ jobs:
           go-version-file: 'go.mod'
       - name: Set up BPF and Linux Headers
         run: |
+          set -euxo pipefail
           sudo apt-get update
 
-          # Try to install tools matching the *running kernel* (works when available)
-          sudo apt-get install -y \
-            libbpf-dev \
-            linux-tools-$(uname -r) \
-            linux-cloud-tools-$(uname -r) \
-            linux-tools-generic \
-            linux-cloud-tools-generic \
-            || true
+          KREL="$(uname -r)"   # e.g. 6.14.0-1017-azure
+          sudo apt-get install -y libbpf-dev \
+            "linux-tools-${KREL}" \
+            "linux-cloud-tools-${KREL}" \
+            linux-tools-azure \
+            linux-cloud-tools-azure
 
-          # Find the actual bpftool binary (commonly shipped under /usr/lib/linux-tools/<ver>/bpftool)
-          BPFTOOL_CANDIDATE="$(command -v bpftool || true)"
-          if [ -z "$BPFTOOL_CANDIDATE" ]; then
-            BPFTOOL_CANDIDATE="$(ls -1 /usr/lib/linux-tools/*/bpftool 2>/dev/null | head -n1 || true)"
+          # ensure we are using the real bpftool binary, not just a wrapper
+          if [ -x "/usr/lib/linux-tools/${KREL}/bpftool" ]; then
+            sudo ln -sf "/usr/lib/linux-tools/${KREL}/bpftool" /usr/local/bin/bpftool
           fi
 
-          test -n "$BPFTOOL_CANDIDATE"
-          echo "Using bpftool at: $BPFTOOL_CANDIDATE"
-          sudo ln -sf "$BPFTOOL_CANDIDATE" /usr/local/bin/bpftool
-
-          # sanity checks
+          command -v bpftool
           bpftool version || true
           test -r /sys/kernel/btf/vmlinux
 
