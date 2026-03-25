@@ -4,7 +4,7 @@ Golang based SDK for kernel eBPF operations i.e, load/attach/detach eBPF program
 
 SDK currently supports -
 
-1. eBPF program types -
+1. eBPF program types - 2
    a. Traffic Classifiers
    b. XDP
    c. Kprobes/Kretprobes
