@@ -23,12 +23,30 @@ jobs:
       - name: Set up BPF and Linux Headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y libbpf-dev 
-          sudo apt-get install -y linux-tools-common 
-          sudo apt-get install -y linux-headers-$(uname -r) libelf-dev zlib1g-dev  
-          git clone --depth=1 --branch v7.3.0 https://github.com/libbpf/bpftool.git
-          make -C bpftool/src
-          sudo make -C bpftool/src install
+
+          # Try to install tools matching the *running kernel* (works when available)
+          sudo apt-get install -y \
+            libbpf-dev \
+            linux-tools-$(uname -r) \
+            linux-cloud-tools-$(uname -r) \
+            linux-tools-generic \
+            linux-cloud-tools-generic \
+            || true
+
+          # Find the actual bpftool binary (commonly shipped under /usr/lib/linux-tools/<ver>/bpftool)
+          BPFTOOL_CANDIDATE="$(command -v bpftool || true)"
+          if [ -z "$BPFTOOL_CANDIDATE" ]; then
+            BPFTOOL_CANDIDATE="$(ls -1 /usr/lib/linux-tools/*/bpftool 2>/dev/null | head -n1 || true)"
+          fi
+
+          test -n "$BPFTOOL_CANDIDATE"
+          echo "Using bpftool at: $BPFTOOL_CANDIDATE"
+          sudo ln -sf "$BPFTOOL_CANDIDATE" /usr/local/bin/bpftool
+
+          # sanity checks
+          bpftool version || true
+          test -r /sys/kernel/btf/vmlinux
+
       - name: Build
         run: make build-linux
       - name: Unit test
