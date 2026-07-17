@@ -130,7 +130,7 @@ type BpfMapShowAttr struct {
 type BpfObjGetInfo struct {
 	bpf_fd   uint32
 	info_len uint32
-	info     uintptr
+	info     unsafe.Pointer
 }
 
 /*
@@ -141,7 +141,7 @@ type BpfObjGetInfo struct {
  * };
  */
 type BpfObjGet struct {
-	pathname   uintptr
+	pathname   unsafe.Pointer
 	bpf_fd     uint32
 	file_flags uint32
 }
@@ -544,7 +544,7 @@ func GetBPFmapInfo(mapFD int) (BpfMapInfo, error) {
 	objInfo := BpfObjGetInfo{
 		bpf_fd:   uint32(mapFD),
 		info_len: uint32(unsafe.Sizeof(bpfMapInfo)),
-		info:     uintptr(unsafe.Pointer(&bpfMapInfo)),
+		info:     unsafe.Pointer(&bpfMapInfo),
 	}
 
 	err := objInfo.BpfGetMapInfoForFD()
@@ -604,7 +604,7 @@ func (m *BpfMap) GetMapFromPinPath(pinPath string) (BpfMapInfo, error) {
 
 	cPath := []byte(pinPath + "\x00")
 	objInfo := BpfObjGet{
-		pathname: uintptr(unsafe.Pointer(&cPath[0])),
+		pathname: unsafe.Pointer(&cPath[0]),
 	}
 
 	mapFD, err := objInfo.BpfGetObject()

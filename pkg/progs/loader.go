@@ -147,7 +147,7 @@ type BpfProgAttr struct {
 type BpfObjGetInfo struct {
 	bpf_fd   uint32
 	info_len uint32
-	info     uintptr
+	info     unsafe.Pointer
 }
 
 /*
@@ -158,7 +158,7 @@ type BpfObjGetInfo struct {
  * };
  */
 type BpfObjGet struct {
-	pathname   uintptr
+	pathname   unsafe.Pointer
 	bpf_fd     uint32
 	file_flags uint32
 }
@@ -345,7 +345,7 @@ func GetBPFprogInfo(progFD int) (BpfProgInfo, error) {
 	objInfo := BpfObjGetInfo{
 		bpf_fd:   uint32(progFD),
 		info_len: uint32(unsafe.Sizeof(bpfProgInfo)),
-		info:     uintptr(unsafe.Pointer(&bpfProgInfo)),
+		info:     unsafe.Pointer(&bpfProgInfo),
 	}
 
 	err := objInfo.BpfGetProgramInfoForFD()
@@ -363,6 +363,9 @@ func GetBPFprogInfo(progFD int) (BpfProgInfo, error) {
 
 func (m *BpfProgram) GetBPFProgAssociatedMapsIDs(progFD int) ([]uint32, error) {
 	bpfProgInfo, err := GetBPFprogInfo(progFD)
+	if err != nil {
+		return nil, fmt.Errorf("GetBPFprogInfo failed for fd %d: %w", progFD, err)
+	}
 
 	if bpfProgInfo.NrMapIDs <= 0 {
 		return nil, nil
@@ -377,7 +380,7 @@ func (m *BpfProgram) GetBPFProgAssociatedMapsIDs(progFD int) ([]uint32, error) {
 	objInfo := BpfObjGetInfo{
 		bpf_fd:   uint32(progFD),
 		info_len: uint32(unsafe.Sizeof(newBpfProgInfo)),
-		info:     uintptr(unsafe.Pointer(&newBpfProgInfo)),
+		info:     unsafe.Pointer(&newBpfProgInfo),
 	}
 
 	err = objInfo.BpfGetProgramInfoForFD()
@@ -398,7 +401,7 @@ func BpfGetMapInfoFromProgInfo(progFD int, numMaps uint32) ([]ebpf_maps.BpfMapIn
 	objInfo := BpfObjGetInfo{
 		bpf_fd:   uint32(progFD),
 		info_len: uint32(unsafe.Sizeof(newBpfProgInfo)),
-		info:     uintptr(unsafe.Pointer(&newBpfProgInfo)),
+		info:     unsafe.Pointer(&newBpfProgInfo),
 	}
 
 	err := objInfo.BpfGetProgramInfoForFD()
@@ -486,7 +489,7 @@ func (m *BpfProgram) GetProgFromPinPath(pinPath string) (BpfProgInfo, int, error
 
 	cPath := []byte(pinPath + "\x00")
 	objInfo := BpfObjGet{
-		pathname: uintptr(unsafe.Pointer(&cPath[0])),
+		pathname: unsafe.Pointer(&cPath[0]),
 	}
 
 	progFD, err := objInfo.BpfGetObject()
