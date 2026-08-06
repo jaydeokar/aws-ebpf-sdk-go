@@ -26,6 +26,7 @@ import (
 	constdef "github.com/aws/aws-ebpf-sdk-go/pkg/constants"
 	"github.com/aws/aws-ebpf-sdk-go/pkg/logger"
 	ebpf_maps "github.com/aws/aws-ebpf-sdk-go/pkg/maps"
+	"github.com/aws/aws-ebpf-sdk-go/pkg/metrics"
 	"github.com/aws/aws-ebpf-sdk-go/pkg/utils"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -40,6 +41,35 @@ type BpfProgAPIs interface {
 }
 
 var log = logger.Get()
+
+// maxProgLoadAttempts bounds how many times BPF_PROG_LOAD is retried on EAGAIN
+// (verifier interrupted by a pending signal). 5 attempts comfortably covers the
+// observed sub-1% EAGAIN rate while still surfacing a genuinely stuck load.
+const maxProgLoadAttempts = 5
+
+// loadProgWithRetry runs the BPF_PROG_LOAD syscall (provided by load) and
+// retries it on EAGAIN up to maxProgLoadAttempts times.
+//
+// The kernel BPF verifier returns EAGAIN when interrupted by a pending signal
+// mid-verify (see kernel/bpf/verifier.c: bpf_check → signal_pending → -EAGAIN).
+// A bounded retry handles transient interruptions without livelocking.
+func loadProgWithRetry(load func() (uintptr, syscall.Errno)) (uintptr, syscall.Errno) {
+	var fd uintptr
+	var errno syscall.Errno
+	for attempt := 1; ; attempt++ {
+		fd, errno = load()
+		if errno == unix.EAGAIN {
+			if attempt < maxProgLoadAttempts {
+				metrics.RecordProgLoadEAGAINRetry()
+				log.Infof("BPF_PROG_LOAD returned EAGAIN (attempt %d/%d), retrying", attempt, maxProgLoadAttempts)
+				continue
+			}
+			metrics.RecordProgLoadEAGAINExhausted()
+			log.Errorf("BPF_PROG_LOAD still EAGAIN after %d attempts, giving up - prog load failed", maxProgLoadAttempts)
+		}
+		return fd, errno
+	}
+}
 
 type CreateEBPFProgInput struct {
 	ProgType       string
@@ -231,13 +261,16 @@ func (m *BpfProgram) LoadProg(progMetaData CreateEBPFProgInput) (int, error) {
 	license := []byte(progMetaData.LicenseStr)
 	program.License = uintptr(unsafe.Pointer(&license[0]))
 
-	fd, _, errno := unix.Syscall(unix.SYS_BPF,
-		uintptr(constdef.BPF_PROG_LOAD),
-		uintptr(unsafe.Pointer(&program)),
-		unsafe.Sizeof(program))
-	runtime.KeepAlive(progMetaData.ProgData)
-	runtime.KeepAlive(license)
-	runtime.KeepAlive(logBuf)
+	fd, errno := loadProgWithRetry(func() (uintptr, syscall.Errno) {
+		r, _, e := unix.Syscall(unix.SYS_BPF,
+			uintptr(constdef.BPF_PROG_LOAD),
+			uintptr(unsafe.Pointer(&program)),
+			unsafe.Sizeof(program))
+		runtime.KeepAlive(progMetaData.ProgData)
+		runtime.KeepAlive(license)
+		runtime.KeepAlive(logBuf)
+		return r, e
+	})
 
 	log.Infof("Load prog done with fd : %d errno: %d (%s) insnCnt: %d attrSize: %d progType: %d", int(fd), int(errno), errno.Error(), program.InsnCnt, unsafe.Sizeof(program), program.ProgType)
 	if errno != 0 {
