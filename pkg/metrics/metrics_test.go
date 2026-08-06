@@ -21,6 +21,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// resetProgLoadEAGAINCounters zeroes the counters so each test starts from a
+// known state; counters are otherwise monotonic.
+func resetProgLoadEAGAINCounters() {
+	progLoadEAGAINRetries.Store(0)
+	progLoadEAGAINExhausted.Store(0)
+}
+
 func TestProgLoadEAGAINCounters(t *testing.T) {
 	resetProgLoadEAGAINCounters()
 

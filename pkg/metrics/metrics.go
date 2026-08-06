@@ -47,10 +47,3 @@ func ProgLoadEAGAINRetries() uint64 { return progLoadEAGAINRetries.Load() }
 // ProgLoadEAGAINExhausted returns the cumulative number of BPF_PROG_LOAD calls
 // that exhausted all retry attempts on EAGAIN and failed.
 func ProgLoadEAGAINExhausted() uint64 { return progLoadEAGAINExhausted.Load() }
-
-// resetProgLoadEAGAINCounters zeroes the counters. It exists for tests, which
-// rely on a known starting value; counters are otherwise monotonic.
-func resetProgLoadEAGAINCounters() {
-	progLoadEAGAINRetries.Store(0)
-	progLoadEAGAINExhausted.Store(0)
-}

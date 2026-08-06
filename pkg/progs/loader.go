@@ -50,16 +50,9 @@ const maxProgLoadAttempts = 5
 // loadProgWithRetry runs the BPF_PROG_LOAD syscall (provided by load) and
 // retries it on EAGAIN up to maxProgLoadAttempts times.
 //
-// The kernel BPF verifier aborts with EAGAIN if a (non-fatal) signal is pending
-// on the loading thread mid-verify. The Go runtime fires SIGURG constantly for
-// asynchronous preemption and GC stop-the-world, so under high pod-create
-// concurrency a SIGURG can land during a load's verify window and trip an
-// otherwise valid load.
-//
-// The retry is intentionally signal-agnostic rather than masking signals: the
-// culprit (SIGURG) is owned and re-armed by the Go runtime and cannot be
-// cleanly masked without breaking async preemption. It is bounded so a
-// genuinely stuck load still surfaces instead of livelocking.
+// The kernel BPF verifier returns EAGAIN when interrupted by a pending signal
+// mid-verify (see kernel/bpf/verifier.c: bpf_check → signal_pending → -EAGAIN).
+// A bounded retry handles transient interruptions without livelocking.
 func loadProgWithRetry(load func() (uintptr, syscall.Errno)) (uintptr, syscall.Errno) {
 	var fd uintptr
 	var errno syscall.Errno
@@ -72,7 +65,7 @@ func loadProgWithRetry(load func() (uintptr, syscall.Errno)) (uintptr, syscall.E
 				continue
 			}
 			metrics.RecordProgLoadEAGAINExhausted()
-			log.Errorf("BPF_PROG_LOAD still EAGAIN after %d attempts, giving up - prog left unattached", maxProgLoadAttempts)
+			log.Errorf("BPF_PROG_LOAD still EAGAIN after %d attempts, giving up - prog load failed", maxProgLoadAttempts)
 		}
 		return fd, errno
 	}
